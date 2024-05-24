@@ -7,10 +7,9 @@ import telegram
 from dotenv import load_dotenv
 
 
-def download_image(url):
+def download_image(url, path):
     response = requests.get(url)
     response.raise_for_status()
-    path = urllib.parse.urlsplit(url).path.replace('/', '_')
     with open(path, 'wb') as f:
         f.write(response.content)
     return path
@@ -29,8 +28,8 @@ def download_comic(comic_num):
     response.raise_for_status()
     image_url = response.json()['img']
     image_comment = response.json()['alt']
-    image_path = download_image(image_url)
-    return image_path, image_comment
+    image_path = urllib.parse.urlsplit(image_url).path.replace('/', '_')
+    return image_url, image_path, image_comment
 
 
 if __name__ == '__main__':
@@ -41,16 +40,17 @@ if __name__ == '__main__':
     seconds_per_day = 86400
 
     while True:
-        # get amount of comics
         last_comic_num = get_last_comic_num()
-        # get random comic num
         rand_comic_num = random.randint(1, last_comic_num)
-        # download comic
-        image_path, image_comment = download_comic(rand_comic_num)
-        # publish it
-        with open(image_path, 'rb') as f:
-            bot.send_photo(chat_id=chat_id, photo=f, caption=image_comment)
-        # delete it
-        os.remove(image_path)
-        # wait till nex day
-        time.sleep(seconds_per_day)
+        image_path = None
+        try:
+            image_url, image_path, image_comment = download_comic(
+                rand_comic_num)
+            download_image(image_url, image_path)
+            with open(image_path, 'rb') as f:
+                bot.send_photo(chat_id=chat_id, photo=f, caption=image_comment)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+        finally:
+            os.remove(image_path)
+            time.sleep(seconds_per_day)
